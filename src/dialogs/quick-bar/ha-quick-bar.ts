@@ -134,7 +134,6 @@ export class QuickBar extends LitElement {
               active
             ></ha-circular-progress>`
           : html`<mwc-list
-              activatable
               @rangechange=${this._handleRangeChanged}
               @keydown=${this._handleListItemKeyDown}
               @selected=${this._handleSelected}
@@ -298,7 +297,7 @@ export class QuickBar extends LitElement {
   private _generateEntityItems(): QuickBarItem[] {
     return Object.keys(this.hass.states)
       .map((entityId) => ({
-        text: computeStateName(this.hass.states[entityId]),
+        text: computeStateName(this.hass.states[entityId]) || entityId,
         altText: entityId,
         icon: domainIcon(computeDomain(entityId), this.hass.states[entityId]),
         action: () => fireEvent(this, "hass-more-info", { entityId }),
@@ -363,6 +362,12 @@ export class QuickBar extends LitElement {
 
         mwc-list-item {
           width: 100%;
+          --mdc-ripple-color: transparent;
+        }
+
+        [mwc-list-item]:not([selected]):hover,
+        [mwc-list-item]:not([selected]):focus {
+          background-color: var(--secondary-background-color);
         }
       `,
     ];

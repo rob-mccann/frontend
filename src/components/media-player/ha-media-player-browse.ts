@@ -45,6 +45,11 @@ import "../ha-card";
 import "../ha-circular-progress";
 import "../ha-paper-dropdown-menu";
 import "../ha-svg-icon";
+import "./ha-media-grid-item";
+import {
+  MediaPlayerItemAction,
+  MediaPlayerItemThumbnailRatio,
+} from "./ha-media-grid-item";
 
 declare global {
   interface HASSDomEvents {
@@ -254,77 +259,26 @@ export class HaMediaPlayerBrowse extends LitElement {
           : currentItem.children?.length
           ? childrenMediaClass.layout === "grid"
             ? html`
-                <div
-                  class="children ${classMap({
-                    portrait: childrenMediaClass.thumbnail_ratio === "portrait",
-                  })}"
-                >
+                <div class="children">
                   ${currentItem.children.map(
                     (child) => html`
-                      <div
-                        class="child"
-                        .item=${child}
-                        @click=${this._childClicked}
-                      >
-                        <div class="ha-card-parent">
-                          <ha-card
-                            outlined
-                            style=${styleMap({
-                              backgroundImage: child.thumbnail
-                                ? `url(${child.thumbnail})`
-                                : "none",
-                            })}
-                          >
-                            ${!child.thumbnail
-                              ? html`
-                                  <ha-svg-icon
-                                    class="folder"
-                                    .path=${MediaClassBrowserSettings[
-                                      child.media_class === "directory"
-                                        ? child.children_media_class ||
-                                          child.media_class
-                                        : child.media_class
-                                    ].icon}
-                                  ></ha-svg-icon>
-                                `
-                              : ""}
-                          </ha-card>
-                          ${child.can_play
-                            ? html`
-                                <mwc-icon-button
-                                  class="play ${classMap({
-                                    can_expand: child.can_expand,
-                                  })}"
-                                  .item=${child}
-                                  .label=${this.hass.localize(
-                                    `ui.components.media-browser.${this.action}-media`
-                                  )}
-                                  @click=${this._actionClicked}
-                                >
-                                  <ha-svg-icon
-                                    .path=${this.action === "play"
-                                      ? mdiPlay
-                                      : mdiPlus}
-                                  ></ha-svg-icon>
-                                </mwc-icon-button>
-                              `
-                            : ""}
-                        </div>
-                        <div class="title">
-                          ${child.title}
-                          <paper-tooltip
-                            fitToVisibleBounds
-                            position="top"
-                            offset="4"
-                            >${child.title}</paper-tooltip
-                          >
-                        </div>
-                        <div class="type">
-                          ${this.hass.localize(
-                            `ui.components.media-browser.content-type.${child.media_content_type}`
-                          )}
-                        </div>
-                      </div>
+                      <ha-media-grid-item
+                        .thumbnailRatio=${
+                          childrenMediaClass.thumbnail_ratio === "portrait"
+                            ? MediaPlayerItemThumbnailRatio.PORTRAIT
+                            : MediaPlayerItemThumbnailRatio.SQUARE
+                        }
+                        .action=${
+                          child.can_play
+                            ? MediaPlayerItemAction.PLAY
+                            : MediaPlayerItemAction.EXPAND
+                        }
+                        .mediaPlayerItem=${child}
+                        .hass=${this.hass}
+                        @media-item-action-clicked=${this._actionClicked}
+                        @media-item-clicked=${
+                          this._childClicked
+                        }></ha-media-item>
                     `
                   )}
                 </div>
@@ -483,22 +437,20 @@ export class HaMediaPlayerBrowse extends LitElement {
     requestAnimationFrame(animate);
   }
 
-  private _actionClicked(ev: MouseEvent): void {
+  private _actionClicked(ev: CustomEvent<MediaPlayerItem>): void {
     ev.stopPropagation();
-    const item = (ev.currentTarget as any).item;
 
-    this._runAction(item);
+    this._runAction(ev.detail);
   }
 
   private _runAction(item: MediaPlayerItem): void {
     fireEvent(this, "media-picked", { item });
   }
 
-  private async _childClicked(ev: MouseEvent): Promise<void> {
-    const target = ev.currentTarget as any;
-    const item: MediaPlayerItem = target.item;
+  private async _childClicked(ev: CustomEvent<MediaPlayerItem>): Promise<void> {
+    const item = ev.detail;
 
-    if (!item) {
+    if (!ev.detail) {
       return;
     }
 
@@ -731,6 +683,10 @@ export class HaMediaPlayerBrowse extends LitElement {
 
         /* ============= CHILDREN ============= */
 
+        .children.portrait ha-card {
+          padding-bottom: 150%;
+        }
+
         mwc-list {
           --mdc-list-vertical-padding: 0;
           --mdc-list-item-graphic-margin: 0;
@@ -762,95 +718,6 @@ export class HaMediaPlayerBrowse extends LitElement {
             auto-fit,
             minmax(var(--media-browse-item-size, 175px), 0.33fr)
           );
-        }
-
-        .child {
-          display: flex;
-          flex-direction: column;
-          cursor: pointer;
-        }
-
-        .ha-card-parent {
-          position: relative;
-          width: 100%;
-        }
-
-        .children ha-card {
-          width: 100%;
-          padding-bottom: 100%;
-          position: relative;
-          box-sizing: border-box;
-          background-size: cover;
-          background-repeat: no-repeat;
-          background-position: center;
-          transition: padding-bottom 0.1s ease-out;
-        }
-
-        .portrait.children ha-card {
-          padding-bottom: 150%;
-        }
-
-        .child .folder,
-        .child .play {
-          position: absolute;
-        }
-
-        .child .folder {
-          color: var(--secondary-text-color);
-          top: calc(50% - (var(--mdc-icon-size) / 2));
-          left: calc(50% - (var(--mdc-icon-size) / 2));
-          --mdc-icon-size: calc(var(--media-browse-item-size, 175px) * 0.4);
-        }
-
-        .child .play {
-          transition: color 0.5s;
-          border-radius: 50%;
-          bottom: calc(50% - 35px);
-          right: calc(50% - 35px);
-          opacity: 0;
-          transition: opacity 0.1s ease-out;
-        }
-
-        .child .play:not(.can_expand) {
-          --mdc-icon-button-size: 70px;
-          --mdc-icon-size: 48px;
-        }
-
-        .ha-card-parent:hover .play:not(.can_expand) {
-          opacity: 1;
-          color: var(--primary-color);
-        }
-
-        .child .play.can_expand {
-          opacity: 1;
-          background-color: rgba(var(--rgb-card-background-color), 0.5);
-          bottom: 4px;
-          right: 4px;
-        }
-
-        .child .play:hover {
-          color: var(--primary-color);
-        }
-
-        .ha-card-parent:hover ha-card {
-          opacity: 0.5;
-        }
-
-        .child .title {
-          font-size: 16px;
-          padding-top: 8px;
-          padding-left: 2px;
-          overflow: hidden;
-          display: -webkit-box;
-          -webkit-box-orient: vertical;
-          -webkit-line-clamp: 2;
-          text-overflow: ellipsis;
-        }
-
-        .child .type {
-          font-size: 12px;
-          color: var(--secondary-text-color);
-          padding-left: 2px;
         }
 
         mwc-list-item .graphic {

@@ -9,10 +9,8 @@ import {
   TemplateResult,
 } from "lit-element";
 import { fireEvent, HASSDomEvent } from "../../common/dom/fire_event";
-import type {
-  MediaPickedEvent,
-  MediaPlayerBrowseAction,
-} from "../../data/media-player";
+import type { MediaPickedEvent } from "../../data/media-player";
+import { MediaPlayerBrowseAction } from "../../data/media-player";
 import { haStyleDialog } from "../../resources/styles";
 import type { HomeAssistant } from "../../types";
 import "../ha-dialog";
@@ -38,7 +36,7 @@ class DialogMediaPlayerBrowse extends LitElement {
     this._entityId = this._params.entityId;
     this._mediaContentId = this._params.mediaContentId;
     this._mediaContentType = this._params.mediaContentType;
-    this._action = this._params.action || "play";
+    this._action = this._params.action || MediaPlayerBrowseAction.PLAY;
   }
 
   public closeDialog() {

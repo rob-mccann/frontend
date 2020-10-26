@@ -8,61 +8,61 @@ import {
   css,
 } from "lit-element";
 
-import { classMap } from "lit-html/directives/class-map";
 import { styleMap } from "lit-html/directives/style-map";
+import { classMap } from "lit-html/directives/class-map";
 
 import { mdiPlay, mdiPlus } from "@mdi/js";
+
+import "../ha-card";
 
 import type { HomeAssistant } from "../../types";
 import {
   MediaClassBrowserSettings,
+  MediaPlayerBrowseAction,
   MediaPlayerItem,
 } from "../../data/media-player";
-
-export enum MediaPlayerItemAction {
-  PLAY = "play",
-  EXPAND = "expand",
-}
 
 export enum MediaPlayerItemThumbnailRatio {
   PORTRAIT = "portrait",
   SQUARE = "square",
 }
 
+export enum ClickEventTarget {
+  ITEM = "item",
+  ACTION = "action",
+}
+
 @customElement("ha-media-grid-item")
-export class MediaLauncherCardMediaItem extends LitElement {
+export class MediaGridItem extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
-  @property() public mediaPlayerItem?: MediaPlayerItem;
-  @property() public action?: MediaPlayerItemAction =
-    MediaPlayerItemAction.PLAY;
+  @property() public item?: MediaPlayerItem;
+  @property() public action?: MediaPlayerBrowseAction;
   @property() public thumbnailRatio: MediaPlayerItemThumbnailRatio =
     MediaPlayerItemThumbnailRatio.SQUARE;
+  @property() public expandable: boolean = false;
 
-  private onActionClick(ev: MouseEvent): void {
+  private onClick(target: ClickEventTarget, ev: MouseEvent): void {
     ev.stopPropagation();
+
+    if (!this.action && !this.expandable) {
+      return;
+    }
 
     const item = (ev.currentTarget as any).item as MediaPlayerItem;
 
-    this.dispatchEvent(
-      new CustomEvent<MediaPlayerItem>("media-item-action-clicked", {
-        detail: item,
-      })
-    );
-  }
-
-  private onItemClick(ev: MouseEvent): void {
-    ev.stopPropagation();
-
-    const item = (ev.currentTarget as any).item as MediaPlayerItem;
+    const eventName =
+      target === ClickEventTarget.ITEM
+        ? "media-item-clicked"
+        : "media-item-action-clicked";
 
     this.dispatchEvent(
-      new CustomEvent<MediaPlayerItem>("media-item-clicked", { detail: item })
+      new CustomEvent<MediaPlayerItem>(eventName, { detail: item })
     );
   }
 
   private get icon(): string {
     switch (this.action) {
-      case MediaPlayerItemAction.PLAY:
+      case MediaPlayerBrowseAction.PLAY:
         return mdiPlay;
       default:
         return mdiPlus;
@@ -70,37 +70,39 @@ export class MediaLauncherCardMediaItem extends LitElement {
   }
 
   protected render(): TemplateResult | void {
-    const item = this.mediaPlayerItem;
-
-    if (!item || !this.hass) {
+    if (!this.item || !this.hass) {
       return html``;
     }
 
     return html`
       <div
-        class="item"
-        .item=${item}
-        @click=${this.onItemClick}
+        class="item ${classMap({
+          ["item-expandable"]: this.expandable,
+          ["item-actionnable"]: !!this.action,
+        })}"
+        .item=${this.item}
+        @click=${this.onClick.bind(this, ClickEventTarget.ITEM)}
         >
         <div class="ha-card-parent">
           <ha-card
             outlined
             class=${`thumbnail-ratio-${this.thumbnailRatio}`}
             style=${styleMap({
-              backgroundImage: item.thumbnail
-                ? `url(${item.thumbnail})`
+              backgroundImage: this.item.thumbnail
+                ? `url(${this.item.thumbnail})`
                 : "none",
             })}
           >
             ${
-              !item.thumbnail
+              !this.item.thumbnail
                 ? html`
                     <ha-svg-icon
                       class="large-icon"
                       .path=${MediaClassBrowserSettings[
-                        item.media_class === "directory"
-                          ? item.children_media_class || item.media_class
-                          : item.media_class
+                        this.item.media_class === "directory"
+                          ? this.item.children_media_class ||
+                            this.item.media_class
+                          : this.item.media_class
                       ].icon}
                     ></ha-svg-icon>
                   `
@@ -108,15 +110,15 @@ export class MediaLauncherCardMediaItem extends LitElement {
             }
           </ha-card>
           ${
-            item.can_play
+            this.action
               ? html`
                   <mwc-icon-button
                     class="icon ${this.action}"
-                    .item=${item}
+                    .item=${this.item}
                     .label=${this.hass.localize(
                       `ui.components.media-browser.${this.action}-media`
                     )}
-                    @click=${this.onActionClick}
+                    @click=${this.onClick.bind(this, ClickEventTarget.ACTION)}
                   >
                     <ha-svg-icon .path=${this.icon}></ha-svg-icon>
                   </mwc-icon-button>
@@ -125,17 +127,16 @@ export class MediaLauncherCardMediaItem extends LitElement {
           }
         </div>
         <div class="title">
-          ${item.title}
+          ${this.item.title}
           <paper-tooltip
             fitToVisibleBounds
             position="top"
             offset="4"
-            >${item.title}</paper-tooltip
-          >
+            >${this.item.title}</paper-tooltip>
         </div>
         <div class="type">
           ${this.hass.localize(
-            `ui.components.media-browser.content-type.${item.media_content_type}`
+            `ui.components.media-browser.content-type.${this.item.media_content_type}`
           )}
         </div>
       </div>
@@ -149,6 +150,10 @@ export class MediaLauncherCardMediaItem extends LitElement {
       .item {
         display: flex;
         flex-direction: column;
+      }
+
+      .item-actionnable,
+      .item-expandable {
         cursor: pointer;
       }
 
@@ -180,8 +185,6 @@ export class MediaLauncherCardMediaItem extends LitElement {
         right: calc(50% - 35px);
         opacity: 0;
         transition: opacity 0.1s ease-out;
-        --mdc-icon-button-size: 70px;
-        --mdc-icon-size: 48px;
       }
 
       .item .large-icon {
@@ -192,12 +195,17 @@ export class MediaLauncherCardMediaItem extends LitElement {
         --mdc-icon-size: calc(var(--media-browse-item-size, 175px) * 0.4);
       }
 
-      .ha-card-parent:hover .icon {
+      .item:not(.item-expandable) .ha-card-parent:hover .icon {
         opacity: 1;
         color: var(--primary-color);
       }
 
-      .item .icon.expand {
+      .item:not(.item-expandable) .icon {
+        --mdc-icon-button-size: 70px;
+        --mdc-icon-size: 48px;
+      }
+
+      .item-expandable .icon {
         opacity: 1;
         background-color: rgba(var(--rgb-card-background-color), 0.5);
         bottom: 4px;
@@ -208,7 +216,8 @@ export class MediaLauncherCardMediaItem extends LitElement {
         color: var(--primary-color);
       }
 
-      .ha-card-parent:hover ha-card {
+      .item-actionnable .ha-card-parent:hover ha-card,
+      .item-expandable .ha-card-parent:hover ha-card {
         opacity: 0.5;
       }
 

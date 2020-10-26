@@ -36,7 +36,10 @@ export const SUPPORT_SELECT_SOUND_MODE = 65536;
 export const SUPPORT_BROWSE_MEDIA = 131072;
 export const CONTRAST_RATIO = 4.5;
 
-export type MediaPlayerBrowseAction = "pick" | "play";
+export enum MediaPlayerBrowseAction {
+  PICK = "pick",
+  PLAY = "play",
+}
 
 export const BROWSER_PLAYER = "browser";
 
